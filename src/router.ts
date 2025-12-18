@@ -445,16 +445,15 @@ class Router<
     this.opts.prefix = normalizedPrefix;
 
     for (const route of this.stack) {
-      if (previousPrefix && typeof route.path === 'string') {
-        if (route.path.startsWith(previousPrefix)) {
-          route.path = route.path.slice(previousPrefix.length) || '/';
-          route.setPrefix(normalizedPrefix);
-        } else {
-          route.setPrefix(normalizedPrefix);
-        }
-      } else {
-        route.setPrefix(normalizedPrefix);
+      if (
+        previousPrefix &&
+        typeof route.path === 'string' &&
+        route.path.startsWith(previousPrefix)
+      ) {
+        route.path = route.path.slice(previousPrefix.length) || '/';
       }
+
+      route.setPrefix(normalizedPrefix);
     }
 
     return this;
