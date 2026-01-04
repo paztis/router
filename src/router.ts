@@ -30,6 +30,18 @@ import type {
 
 const httpMethods = getAllHttpMethods();
 
+// Public instance type and default export type surface.
+// These are intentionally declared in the type namespace (and can reference RouterImpl below).
+export type RouterInstance<
+  StateT = import('koa').DefaultState,
+  ContextT = import('koa').DefaultContext
+> = RouterImplementation<StateT, ContextT>;
+
+export type Router<
+  StateT = import('koa').DefaultState,
+  ContextT = import('koa').DefaultContext
+> = RouterInstance<StateT, ContextT>;
+
 /**
  * Middleware with router property
  */
@@ -43,7 +55,7 @@ type RouterComposedMiddleware<
 /**
  * @module koa-router
  */
-class Router<
+class RouterImplementation<
   StateT = import('koa').DefaultState,
   ContextT = import('koa').DefaultContext
 > {
@@ -1420,11 +1432,10 @@ interface RouterConstructor {
   readonly prototype: Router;
 }
 
-const RouterExport: RouterConstructor = Router as RouterConstructor;
+export const Router: RouterConstructor =
+  RouterImplementation as unknown as RouterConstructor;
 
-export default RouterExport;
-export { RouterExport as Router };
-export type { Router as RouterInstance };
+export default Router;
 
 /**
  * Create `router.verb()` methods, where *verb* is one of the HTTP verbs such
@@ -1438,10 +1449,11 @@ export type { Router as RouterInstance };
 
 for (const httpMethod of httpMethods) {
   const isAlreadyDefined =
-    COMMON_HTTP_METHODS.includes(httpMethod) || httpMethod in Router.prototype;
+    COMMON_HTTP_METHODS.includes(httpMethod) ||
+    httpMethod in RouterImplementation.prototype;
 
   if (!isAlreadyDefined) {
-    Object.defineProperty(Router.prototype, httpMethod, {
+    Object.defineProperty(RouterImplementation.prototype, httpMethod, {
       value: function (this: Router, ...arguments_: unknown[]) {
         return this._registerMethod(httpMethod, ...arguments_);
       },
