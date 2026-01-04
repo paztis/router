@@ -12,6 +12,7 @@ Common patterns and recipes for building real-world applications with @koa/route
 | **[Authentication & Authorization](./authentication-authorization/)** | JWT-based authentication with role-based access control                           |
 | **[Request Validation](./request-validation/)**                       | Validate request data with Joi middleware                                         |
 | **[Parameter Validation](./parameter-validation/)**                   | Validate and transform URL parameters using `router.param()`                      |
+| **[Regex Parameter Validation](./regex-parameter-validation/)**       | Validate URL parameters with regex (replacement for `:param(regex)` in v14+)      |
 | **[API Versioning](./api-versioning/)**                               | Implement API versioning with multiple routers                                    |
 | **[Error Handling](./error-handling/)**                               | Centralized error handling with custom error classes                              |
 | **[Pagination](./pagination/)**                                       | Pagination middleware with configurable limits and metadata                       |

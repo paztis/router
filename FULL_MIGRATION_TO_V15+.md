@@ -134,6 +134,35 @@ The new version uses **`path-to-regexp` v8** via a wrapper (`src/utils/path-to-r
 
     > **Note:** Custom regex patterns in parameters (`:param(regex)`) are **no longer supported** in v15+ due to path-to-regexp v8. Use validation in handlers or middleware instead.
 
+  - **Helper available (since v15.2):** Use `createParameterValidationMiddleware(name, regexp)` to keep regex validation while moving it into middleware. The same helper can also be used inline on specific routes.
+
+    ```js
+    import Router, { createParameterValidationMiddleware } from '@koa/router';
+
+    const validateUserId = createParameterValidationMiddleware(
+      'id',
+      /^[0-9]+$/
+    );
+
+    router.param('id', validateUserId).get('/user/:id', (ctx) => {
+      ctx.body = { id: Number(ctx.params.id) };
+    });
+    ```
+
+    Inline per-route example (same helper):
+
+    ```js
+    import Router, { createParameterValidationMiddleware } from '@koa/router';
+
+    router.get(
+      '/user/:id',
+      createParameterValidationMiddleware('id', /^[0-9]+$/),
+      (ctx) => {
+        ctx.body = { id: Number(ctx.params.id) };
+      }
+    );
+    ```
+
 - **Migration strategy:**
   - **Before (v10):**
 

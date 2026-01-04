@@ -20,4 +20,9 @@ export type {
   RouterWithMethods
 } from './types';
 
+export {
+  createParameterValidationMiddleware,
+  type ParameterValidationOptions
+} from './utils/parameter-match';
+
 export { default, Router, type RouterInstance } from './router';

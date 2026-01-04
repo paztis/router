@@ -9,5 +9,9 @@
  * - For dist build: '../dist/index'
  * - For published package: '@koa/router'
  */
-export { default, default as Router } from '../src/index';
+export {
+  default,
+  default as Router,
+  createParameterValidationMiddleware
+} from '../src/index';
 export type * from '../src/index';

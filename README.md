@@ -490,6 +490,36 @@ router.get('/files/{/*path}', (ctx) => {
 
 **Note:** Custom regex patterns in parameters (`:param(regex)`) are **no longer supported** in v14+ due to path-to-regexp v8. Use validation in handlers or middleware instead.
 
+**Helper for parameter validation (v14+)** <small>(Added on v15.2)</small>
+
+If you want to keep regex-style validation, register a param middleware instead:
+
+```javascript
+import Router, { createParameterValidationMiddleware } from '@koa/router';
+
+const uuid =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+const validateId = createParameterValidationMiddleware('id', uuid);
+
+router.param('id', validateId).get('/role/:id', middleware);
+```
+
+Or validate inline on a specific route:
+
+```javascript
+import Router, { createParameterValidationMiddleware } from '@koa/router';
+
+const uuid =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+router.get(
+  '/role/:id',
+  createParameterValidationMiddleware('id', uuid),
+  middleware
+);
+```
+
 ### router.routes()
 
 Returns router middleware which dispatches matched routes.
