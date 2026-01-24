@@ -168,12 +168,26 @@ class RouterImplementation<
     middleware: RouterComposedMiddleware<StateT & T, ContextT & U>
   ): Router<StateT, ContextT>;
   use<T = {}, U = {}, B = unknown>(
+    ...middleware: Array<RouterMiddleware<StateT & T, ContextT & U, B>>
+  ): Router<StateT, ContextT>;
+  use<T = {}, U = {}>(
+    ...middleware: Array<RouterComposedMiddleware<StateT & T, ContextT & U>>
+  ): Router<StateT, ContextT>;
+  use<T = {}, U = {}, B = unknown>(
     path: string | RegExp | string[],
     middleware: RouterMiddleware<StateT & T, ContextT & U, B>
   ): Router<StateT, ContextT>;
   use<T = {}, U = {}>(
     path: string | RegExp | string[],
     middleware: RouterComposedMiddleware<StateT & T, ContextT & U>
+  ): Router<StateT, ContextT>;
+  use<T = {}, U = {}, B = unknown>(
+    path: string | RegExp | string[],
+    ...middleware: Array<RouterMiddleware<StateT & T, ContextT & U, B>>
+  ): Router<StateT, ContextT>;
+  use<T = {}, U = {}>(
+    path: string | RegExp | string[],
+    ...middleware: Array<RouterComposedMiddleware<StateT & T, ContextT & U>>
   ): Router<StateT, ContextT>;
   use<T = {}, U = {}, B = unknown>(
     path: string | RegExp | string[],

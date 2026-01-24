@@ -79,6 +79,22 @@ router.use(async (ctx, next) => {
   ctx.set('X-Response-Time', `${ms}ms`);
 });
 
+// ✅ router.use() supports array spreads
+const loggingMiddlewares: Array<RouterMiddleware> = [
+  async (ctx, next) => {
+    ctx.set('X-Request-Ip', ctx.request.ip || 'unknown');
+    await next();
+  },
+  async (ctx, next) => {
+    if (ctx.isUnauthenticated()) {
+      ctx.throw(401, 'Not authenticated');
+    }
+    await next();
+  }
+];
+
+router.use(...loggingMiddlewares);
+
 // ✅ Parameter middleware with type inference
 router.param('id', (value, ctx, next) => {
   // value is inferred as string

@@ -28,6 +28,8 @@ jobs:
         run: yarn run lint
       - name: Build
         run: yarn run build
+      - name: Run typecheck
+        run: yarn run ts:check:strict
       - name: Run test coverage
         run: yarn run test:coverage
 
