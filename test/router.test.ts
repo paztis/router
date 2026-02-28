@@ -1663,7 +1663,6 @@ it('should throw error when called without any middleware functions', () => {
   const router = new Router();
 
   assert.throws(() => {
-    // @ts-expect-error - testing runtime error for missing middleware
     router.use('/path');
   }, /You must provide at least one middleware function/);
 });
@@ -1672,7 +1671,6 @@ it('should throw error when called with only path array and no middleware', () =
   const router = new Router();
 
   assert.throws(() => {
-    // @ts-expect-error - testing runtime error for missing middleware
     router.use(['/path1', '/path2']);
   }, /You must provide at least one middleware function/);
 });
