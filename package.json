@@ -1,17 +1,13 @@
 {
   "name": "@koa/router",
-  "description": "Router middleware for koa. Maintained by Forward Email and Lad.",
+  "description": "Router middleware for Koa.",
   "version": "15.3.0",
-  "author": "Alex Mingoia <talk@alexmingoia.com>",
+  "author": "Koa.js",
   "bugs": {
     "url": "https://github.com/koajs/router/issues",
     "email": "niftylettuce@gmail.com"
   },
   "contributors": [
-    {
-      "name": "Alex Mingoia",
-      "email": "talk@alexmingoia.com"
-    },
     {
       "name": "@koajs"
     },
@@ -117,5 +113,8 @@
     "prebuild": "rimraf dist",
     "build": "tsup",
     "prepublishOnly": "npm run build"
+  },
+  "resolutions": {
+    "c8/yargs": "^18.0.0"
   }
 }
