@@ -192,10 +192,15 @@ import {
   RouterOptions,
   RouterMiddleware,
   RouterParameterMiddleware,
-  RouterParamContext,
   AllowedMethodsOptions,
   UrlOptions,
-  HttpMethod
+  HttpMethod,
+  MatchResult,
+  LayerOptions,
+  Layer,
+  RouterEvent,
+  RouterEventSelector,
+  RouterEvents
 } from '@koa/router';
 import type { Next } from 'koa';
 
@@ -740,6 +745,56 @@ const url = Router.url('/users/:id', { id: 1, name: 'John' });
 // => "/users/1"
 ```
 
+### router.on() (experimental)
+
+Register an event handler on the router for lifecycle events.
+
+**Signature:**
+
+```typescript
+router.on(event: RouterEventSelector, handler: RouterMiddleware): Router
+```
+
+**Parameters:**
+
+| Parameter | Type                  | Description                                                      |
+| --------- | --------------------- | ---------------------------------------------------------------- |
+| `event`   | `RouterEventSelector` | Event name string, `RouterEvents` constant, or selector function |
+| `handler` | `RouterMiddleware`    | Middleware function `(ctx, next) => {}`                          |
+
+**Returns:** Router instance for chaining.
+
+**Active events:**
+
+| Event         | Constant                | Description                               |
+| ------------- | ----------------------- | ----------------------------------------- |
+| `'not-found'` | `RouterEvents.NotFound` | Fires when no route matched path + method |
+
+**Example:**
+
+```javascript
+import { RouterEvents } from '@koa/router';
+
+// All three forms are equivalent:
+router.on(RouterEvents.NotFound, handler); // constant (recommended)
+router.on((events) => events.NotFound, handler); // selector function
+router.on('not-found', handler); // raw string
+
+// Handlers can be chained:
+router
+  .on(RouterEvents.NotFound, async (ctx, next) => {
+    console.log('no route matched:', ctx.path);
+    await next();
+  })
+  .on(RouterEvents.NotFound, (ctx) => {
+    ctx.status = 404;
+    ctx.body = { error: 'Not Found' };
+  });
+```
+
+> **Note:** This API is experimental and may change in future versions. See the
+> [Not Found Event](#not-found-event-experimental) section in Advanced Features for details.
+
 ## Advanced Features
 
 ### Host Matching
@@ -842,7 +897,8 @@ router.get('/post/:id', handler);
 
 ### Catch-All Routes
 
-Create a catch-all route that only runs when no other routes match:
+Create a catch-all route that runs when no specific route handler has set a response.
+Check `!ctx.body` to determine whether a previous handler already responded:
 
 ```javascript
 router.get('/users', handler1);
@@ -850,12 +906,37 @@ router.get('/posts', handler2);
 
 // Catch-all for unmatched routes
 router.all('{/*rest}', (ctx) => {
-  if (!ctx.matched || ctx.matched.length === 0) {
+  if (!ctx.body) {
     ctx.status = 404;
     ctx.body = { error: 'Not Found' };
   }
 });
 ```
+
+> **Note:** `ctx.matched.length === 0` will never be true inside a catch-all handler.
+> The router populates `ctx.matched` **before** the handler body runs, so the catch-all
+> layer (`{/*rest}`) is already included in the array by the time your code executes.
+>
+> **Recommended:** Use `!ctx.body` as shown above — it is the simplest and most reliable
+> condition inside a catch-all route.
+>
+> **Workaround:** If you specifically need `ctx.matched`-based logic inside a catch-all,
+> filter out the catch-all layer first and check the remaining array:
+>
+> ```javascript
+> router.all('{/*rest}', (ctx) => {
+>   const realMatches = ctx.matched.filter(
+>     (layer) => layer.path !== '{/*rest}'
+>   );
+>   if (realMatches.length === 0) {
+>     ctx.status = 404;
+>     ctx.body = { error: 'Not Found' };
+>   }
+> });
+> ```
+>
+> For cleaner and more precise 404 detection, prefer app-level middleware with
+> `ctx.routeMatched` — see the [404 Handling](#404-handling) section.
 
 ### Array of Paths
 
@@ -868,12 +949,30 @@ router.get(['/users', '/people'], handler);
 
 ### 404 Handling
 
-Implement custom 404 handling:
+Implement custom 404 handling using app-level middleware after the router.
+
+**Using `ctx.routeMatched` (recommended):**
 
 ```javascript
 app.use(router.routes());
 
-// 404 middleware - runs after router
+// ctx.routeMatched is set by the router before handlers run
+app.use((ctx) => {
+  if (!ctx.routeMatched) {
+    ctx.status = 404;
+    ctx.body = {
+      error: 'Not Found',
+      path: ctx.path
+    };
+  }
+});
+```
+
+**Using `ctx.matched`:**
+
+```javascript
+app.use(router.routes());
+
 app.use((ctx) => {
   if (!ctx.matched || ctx.matched.length === 0) {
     ctx.status = 404;
@@ -884,6 +983,69 @@ app.use((ctx) => {
   }
 });
 ```
+
+> For a router-scoped alternative that doesn't require app-level middleware,
+> see the [Not Found Event](#not-found-event-experimental) section below.
+
+### Not Found Event (Experimental)
+
+> **Note:** This API is experimental and may change in future versions.
+
+Use `router.on()` for a clean, dedicated 404 handler that runs only when no route
+matched — without needing a catch-all route. Three equivalent forms are supported:
+
+```javascript
+import { RouterEvents } from '@koa/router';
+
+// Named constant (recommended — autocomplete + refactor safe)
+router.on(RouterEvents.NotFound, handler);
+
+// Selector function (fluent style)
+router.on((events) => events.NotFound, handler);
+
+// Raw string (still accepted)
+router.on('not-found', handler);
+```
+
+Full example:
+
+```javascript
+import { RouterEvents } from '@koa/router';
+
+router.get('/users', handler1);
+router.get('/posts', handler2);
+
+router.on(RouterEvents.NotFound, (ctx) => {
+  ctx.status = 404;
+  ctx.body = {
+    error: 'Not Found',
+    path: ctx.path,
+    method: ctx.method
+  };
+});
+
+app.use(router.routes());
+```
+
+Multiple handlers are supported and compose in registration order:
+
+```javascript
+router.on(RouterEvents.NotFound, async (ctx, next) => {
+  console.log('no route matched:', ctx.path);
+  await next();
+});
+
+router.on(RouterEvents.NotFound, (ctx) => {
+  ctx.status = 404;
+  ctx.body = { error: 'Not Found' };
+});
+```
+
+Benefits over catch-all routes:
+
+- Does not appear in `ctx.matched`
+- Only fires when no route matched — no need to check `ctx.routeMatched` or `ctx.body`
+- Handlers compose naturally with `next()`
 
 ## Best Practices
 
@@ -983,6 +1145,9 @@ router.get('/users/:id', (ctx: RouterContext) => {
   // All matched layers
   const matched = ctx.matched; // Array of Layer objects
 
+  // Whether any route (with HTTP methods) was matched
+  const wasMatched = ctx.routeMatched; // boolean | undefined
+
   // Captured values from RegExp routes
   const captures = ctx.captures; // string[] | undefined
 
@@ -1043,11 +1208,13 @@ See the [recipes directory](./recipes/) for complete TypeScript examples:
 - **[Authentication & Authorization](./recipes/authentication-authorization/)** - JWT-based authentication with middleware
 - **[Request Validation](./recipes/request-validation/)** - Validate request data with middleware
 - **[Parameter Validation](./recipes/parameter-validation/)** - Validate and transform parameters using router.param()
+- **[Regex Parameter Validation](./recipes/regex-parameter-validation/)** - Validate URL parameters with regex (replacement for `:param(regex)` in v14+)
 - **[API Versioning](./recipes/api-versioning/)** - Implement API versioning with multiple routers
 - **[Error Handling](./recipes/error-handling/)** - Centralized error handling with custom error classes
 - **[Pagination](./recipes/pagination/)** - Implement pagination for list endpoints
 - **[Health Checks](./recipes/health-checks/)** - Add health check endpoints for monitoring
 - **[TypeScript Recipe](./recipes/typescript-recipe/)** - Full TypeScript example with types and type safety
+- **[Not Found Handling](./recipes/not-found-handling/)** - All approaches to handling unmatched routes: `ctx.routeMatched`, events, catch-all
 
 Each recipe file contains complete, runnable TypeScript code that you can copy and adapt to your needs.
 

@@ -17,8 +17,12 @@ export type {
   AllowedMethodsOptions,
   Layer,
   HttpMethod,
-  RouterWithMethods
+  RouterWithMethods,
+  RouterEvent,
+  RouterEventSelector
 } from './types';
+
+export { RouterEvents } from './utils/router-events';
 
 export {
   createParameterValidationMiddleware,

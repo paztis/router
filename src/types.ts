@@ -232,6 +232,26 @@ export type RouterContext<
   matched?: Layer<StateT, ContextT, BodyT>[];
 
   /**
+   * Whether a route (with HTTP methods) was matched for this request.
+   * Set by the router before any handlers run.
+   *
+   * Use this in app-level middleware after `router.routes()` to detect
+   * requests that the router did not handle.
+   *
+   * @example
+   * ```javascript
+   * app.use(router.routes());
+   * app.use((ctx) => {
+   *   if (!ctx.routeMatched) {
+   *     ctx.status = 404;
+   *     ctx.body = { error: 'Not Found' };
+   *   }
+   * });
+   * ```
+   */
+  routeMatched?: boolean;
+
+  /**
    * Captured values from path
    */
   captures?: string[];
@@ -310,5 +330,7 @@ export type RouterWithMethods<
   ContextT = DefaultContext
 > = Router<StateT, ContextT> &
   Record<Lowercase<M>, RouterMethodFunction<StateT, ContextT>>;
+
+export type { RouterEvent, RouterEventSelector } from './utils/router-events';
 
 export { type default as Layer } from './layer';

@@ -12,6 +12,12 @@ import {
   determineMiddlewarePath
 } from './utils/path-helpers';
 import { debug } from './utils/debug';
+import {
+  RouterEvents,
+  RouterEventEmitter,
+  resolveEvent,
+  type RouterEventSelector
+} from './utils/router-events';
 
 import type {
   Middleware,
@@ -69,6 +75,13 @@ class RouterImplementation<
   >;
   stack: Layer<StateT, ContextT>[];
   host?: string | string[] | RegExp;
+
+  /**
+   * Event emitter for router lifecycle events (experimental)
+   * @internal
+   */
+  private _events: RouterEventEmitter<StateT, ContextT> =
+    new RouterEventEmitter();
 
   /**
    * Create a new router.
@@ -505,6 +518,11 @@ class RouterImplementation<
         return next();
       }
 
+      // TODO: implement 'dispatch' event — fires on every request after host check,
+      // before route matching. Useful for metrics and per-router request logging.
+      // When implementing: add RouterEvents.Dispatch to RouterEvents in router-events.ts,
+      // then call: this._events.emit(RouterEvents.Dispatch, context, next).
+
       const requestPath = this._getRequestPath(context);
 
       const matchResult = this.match(requestPath, context.method);
@@ -512,9 +530,26 @@ class RouterImplementation<
       this._storeMatchedRoutes(context, matchResult);
       context.router = this;
 
+      (context as RouterContext<StateT, ContextT>).routeMatched =
+        matchResult.route;
+
       if (!matchResult.route) {
-        return next();
+        // TODO: implement 'method-not-allowed' event — fires when matchResult.path.length > 0
+        // (path matched but no layer had a matching HTTP method).
+        // When implementing: add RouterEvents.MethodNotAllowed to RouterEvents in router-events.ts,
+        // then call: this._events.emit(RouterEvents.MethodNotAllowed, context, next).
+
+        return this._events.emit(
+          RouterEvents.NotFound,
+          context as RouterContext<StateT, ContextT>,
+          next
+        );
       }
+
+      // TODO: implement 'match' event — fires after a route is matched, before handlers
+      // run. ctx._matchedRoute is already set at this point. Useful for tracing.
+      // When implementing: add RouterEvents.Match to RouterEvents in router-events.ts,
+      // then call: this._events.emit(RouterEvents.Match, context, () => Promise.resolve()).
 
       const matchedLayers = matchResult.pathAndMethod;
       this._setMatchedRouteInfo(context, matchedLayers);
@@ -650,6 +685,59 @@ class RouterImplementation<
 
   routes(): RouterComposedMiddleware<StateT, ContextT> {
     return this.middleware();
+  }
+
+  /**
+   * Register an event handler on the router.
+   *
+   * @experimental This API is experimental and may change in future versions.
+   *
+   * **Active events:**
+   * - `'not-found'` — fires when no route matched path + method. Handlers are
+   *   composed and called instead of `next()`, so they are responsible for
+   *   calling `next()` themselves if they want to pass control downstream.
+   *
+   * @example
+   *
+   * All three forms are equivalent:
+   *
+   * ```javascript
+   * import { RouterEvents } from '@koa/router';
+   *
+   * // Named constant (recommended — autocomplete + refactor safe)
+   * router.on(RouterEvents.NotFound, handler);
+   *
+   * // Selector function (fluent style)
+   * router.on((events) => events.NotFound, handler);
+   *
+   * // Raw string (still accepted)
+   * router.on('not-found', handler);
+   * ```
+   *
+   * Multiple handlers compose in registration order:
+   *
+   * ```javascript
+   * router.on(RouterEvents.NotFound, async (ctx, next) => {
+   *   console.log('no route matched', ctx.path);
+   *   await next();
+   * });
+   * router.on(RouterEvents.NotFound, (ctx) => {
+   *   ctx.status = 404;
+   *   ctx.body = { error: 'Not Found' };
+   * });
+   * ```
+   *
+   * @param event - Event name string, `RouterEvents` constant, or selector
+   *   function `(events) => events.NotFound` (see `RouterEventSelector`)
+   * @param handler - Middleware to run when the event fires
+   * @returns This router instance for chaining
+   */
+  on(
+    event: RouterEventSelector,
+    handler: RouterMiddleware<StateT, ContextT>
+  ): Router<StateT, ContextT> {
+    this._events.register(resolveEvent(event), handler);
+    return this;
   }
 
   /**

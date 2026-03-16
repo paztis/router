@@ -4,19 +4,20 @@ Common patterns and recipes for building real-world applications with @koa/route
 
 ## Available Recipes
 
-| Recipe                                                                | Description                                                                       |
-| --------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| **[TypeScript Recipe](./typescript-recipe/)**                         | Full TypeScript example showcasing **type inference** - no explicit types needed! |
-| **[Nested Routes](./nested-routes/)**                                 | Production-ready nested router patterns with multiple levels (3+ deep)            |
-| **[RESTful API Structure](./restful-api-structure/)**                 | Organize your API with nested routers for clean separation                        |
-| **[Authentication & Authorization](./authentication-authorization/)** | JWT-based authentication with role-based access control                           |
-| **[Request Validation](./request-validation/)**                       | Validate request data with Joi middleware                                         |
-| **[Parameter Validation](./parameter-validation/)**                   | Validate and transform URL parameters using `router.param()`                      |
-| **[Regex Parameter Validation](./regex-parameter-validation/)**       | Validate URL parameters with regex (replacement for `:param(regex)` in v14+)      |
-| **[API Versioning](./api-versioning/)**                               | Implement API versioning with multiple routers                                    |
-| **[Error Handling](./error-handling/)**                               | Centralized error handling with custom error classes                              |
-| **[Pagination](./pagination/)**                                       | Pagination middleware with configurable limits and metadata                       |
-| **[Health Checks](./health-checks/)**                                 | Health check, readiness, and liveness probe endpoints                             |
+| Recipe                                                                | Description                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **[TypeScript Recipe](./typescript-recipe/)**                         | Full TypeScript example showcasing **type inference** - no explicit types needed!  |
+| **[Nested Routes](./nested-routes/)**                                 | Production-ready nested router patterns with multiple levels (3+ deep)             |
+| **[RESTful API Structure](./restful-api-structure/)**                 | Organize your API with nested routers for clean separation                         |
+| **[Authentication & Authorization](./authentication-authorization/)** | JWT-based authentication with role-based access control                            |
+| **[Request Validation](./request-validation/)**                       | Validate request data with Joi middleware                                          |
+| **[Parameter Validation](./parameter-validation/)**                   | Validate and transform URL parameters using `router.param()`                       |
+| **[Regex Parameter Validation](./regex-parameter-validation/)**       | Validate URL parameters with regex (replacement for `:param(regex)` in v14+)       |
+| **[API Versioning](./api-versioning/)**                               | Implement API versioning with multiple routers                                     |
+| **[Error Handling](./error-handling/)**                               | Centralized error handling with custom error classes                               |
+| **[Pagination](./pagination/)**                                       | Pagination middleware with configurable limits and metadata                        |
+| **[Health Checks](./health-checks/)**                                 | Health check, readiness, and liveness probe endpoints                              |
+| **[Not Found Handling](./not-found-handling/)**                       | All approaches to handling unmatched routes: `ctx.routeMatched`, events, catch-all |
 
 ## Key Features Demonstrated
 

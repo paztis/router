@@ -12,6 +12,7 @@
 export {
   default,
   default as Router,
-  createParameterValidationMiddleware
+  createParameterValidationMiddleware,
+  RouterEvents
 } from '../src/index';
 export type * from '../src/index';

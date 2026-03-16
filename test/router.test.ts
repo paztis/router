@@ -11,7 +11,11 @@ import Koa from 'koa';
 import methods from 'methods';
 import request from 'supertest';
 
-import Router, { RouterMiddleware, RouterParameterMiddleware } from '../src';
+import Router, {
+  RouterMiddleware,
+  RouterParameterMiddleware,
+  RouterEvents
+} from '../src';
 import Layer from '../src/layer';
 
 type HttpError = Error & {
@@ -4017,6 +4021,258 @@ describe('RouterOptions: strict (comprehensive)', () => {
         .expect(200);
       assert.strictEqual(userAccountsRes.body.route, 'user-accounts');
       assert.strictEqual(userAccountsRes.body.isAccount, undefined);
+    });
+  });
+
+  describe('Not Found Handling', () => {
+    describe('ctx.routeMatched property', () => {
+      it('routeMatched is true when a named route matches', async () => {
+        const app = new Koa();
+        const router = new Router();
+        let capturedRouteMatched: boolean | undefined;
+
+        router.get('/users', (ctx) => {
+          capturedRouteMatched = ctx.routeMatched;
+          ctx.body = 'Users';
+        });
+
+        app.use(router.routes());
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/users').expect(200).expect('Users');
+        assert.strictEqual(capturedRouteMatched, true);
+      });
+
+      it('routeMatched is false in app middleware when no route matches', async () => {
+        const app = new Koa();
+        const router = new Router();
+        let capturedRouteMatched: boolean | undefined;
+
+        router.get('/users', (ctx) => {
+          ctx.body = 'Users';
+        });
+
+        app.use(router.routes());
+        app.use((ctx) => {
+          capturedRouteMatched = ctx.routeMatched;
+          if (!ctx.routeMatched) {
+            ctx.status = 404;
+            ctx.body = 'Not Found';
+          }
+        });
+
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/unknown').expect(404).expect('Not Found');
+        assert.strictEqual(capturedRouteMatched, false);
+      });
+
+      it('routeMatched is true in app middleware when a route matches', async () => {
+        const app = new Koa();
+        const router = new Router();
+        let capturedRouteMatched: boolean | undefined;
+
+        router.get('/users', async (ctx, next) => {
+          ctx.body = 'Users';
+          await next();
+        });
+
+        app.use(router.routes());
+        app.use((ctx) => {
+          capturedRouteMatched = ctx.routeMatched;
+        });
+
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/users').expect(200).expect('Users');
+        assert.strictEqual(capturedRouteMatched, true);
+      });
+    });
+
+    describe('catch-all routes with !ctx.body', () => {
+      it('catch-all runs for unmatched routes and not for matched ones', async () => {
+        const app = new Koa();
+        const router = new Router();
+
+        router.get('/users', (ctx) => {
+          ctx.status = 200;
+          ctx.body = 'Users';
+        });
+        router.get('/posts', (ctx) => {
+          ctx.status = 200;
+          ctx.body = 'Posts';
+        });
+
+        router.all('{/*rest}', (ctx) => {
+          if (!ctx.body) {
+            ctx.status = 404;
+            ctx.body = 'Not Found';
+          }
+        });
+
+        app.use(router.routes());
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/users').expect(200).expect('Users');
+        await request(server).get('/posts').expect(200).expect('Posts');
+        await request(server).get('/unknown').expect(404).expect('Not Found');
+      });
+    });
+
+    describe('not-found event (experimental)', () => {
+      it('notfound handler runs when no route matches', async () => {
+        const app = new Koa();
+        const router = new Router();
+
+        router.get('/users', (ctx) => {
+          ctx.body = 'Users';
+        });
+
+        router.on('not-found', (ctx) => {
+          ctx.status = 404;
+          ctx.body = 'Not Found';
+        });
+
+        app.use(router.routes());
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/users').expect(200).expect('Users');
+        await request(server).get('/unknown').expect(404).expect('Not Found');
+      });
+
+      it('notfound handler does not run when a route matches', async () => {
+        const app = new Koa();
+        const router = new Router();
+        let notFoundCalled = false;
+
+        router.get('/users', (ctx) => {
+          ctx.body = 'Users';
+        });
+
+        router.on('not-found', (ctx) => {
+          notFoundCalled = true;
+          ctx.status = 404;
+          ctx.body = 'Not Found';
+        });
+
+        app.use(router.routes());
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/users').expect(200).expect('Users');
+        assert.strictEqual(notFoundCalled, false);
+      });
+
+      it('multiple notfound handlers compose in registration order', async () => {
+        const app = new Koa();
+        const router = new Router();
+        const order: number[] = [];
+
+        router.get('/users', (ctx) => {
+          ctx.body = 'Users';
+        });
+
+        router.on('not-found', async (ctx, next) => {
+          order.push(1);
+          await next();
+          order.push(4);
+        });
+
+        router.on('not-found', async (ctx, next) => {
+          order.push(2);
+          await next();
+          order.push(3);
+        });
+
+        router.on('not-found', (ctx) => {
+          ctx.status = 404;
+          ctx.body = 'Not Found';
+        });
+
+        app.use(router.routes());
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/unknown').expect(404).expect('Not Found');
+        assert.deepStrictEqual(order, [1, 2, 3, 4]);
+      });
+
+      it('notfound handler can call next() to pass control downstream', async () => {
+        const app = new Koa();
+        const router = new Router();
+
+        router.on('not-found', async (ctx, next) => {
+          await next();
+        });
+
+        app.use(router.routes());
+        app.use((ctx) => {
+          ctx.status = 404;
+          ctx.body = 'Downstream Not Found';
+        });
+
+        const server = http.createServer(app.callback());
+
+        await request(server)
+          .get('/unknown')
+          .expect(404)
+          .expect('Downstream Not Found');
+      });
+
+      it('router.on() returns the router for chaining', () => {
+        const router = new Router();
+        const result = router.on('not-found', (ctx) => {
+          ctx.status = 404;
+        });
+        assert.strictEqual(result, router);
+      });
+
+      it('should work with RouterEvents.NotFound constant', async () => {
+        const app = new Koa();
+        const router = new Router();
+
+        router.get('/users', (ctx) => {
+          ctx.body = 'Users';
+        });
+
+        router.on(RouterEvents.NotFound, (ctx) => {
+          ctx.status = 404;
+          ctx.body = 'Not Found via constant';
+        });
+
+        app.use(router.routes());
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/users').expect(200).expect('Users');
+        await request(server)
+          .get('/unknown')
+          .expect(404)
+          .expect('Not Found via constant');
+      });
+
+      it('should work with selector function (events) => events.NotFound', async () => {
+        const app = new Koa();
+        const router = new Router();
+
+        router.get('/users', (ctx) => {
+          ctx.body = 'Users';
+        });
+
+        router.on(
+          (events) => events.NotFound,
+          (ctx) => {
+            ctx.status = 404;
+            ctx.body = 'Not Found via selector';
+          }
+        );
+
+        app.use(router.routes());
+        const server = http.createServer(app.callback());
+
+        await request(server).get('/users').expect(200).expect('Users');
+        await request(server)
+          .get('/unknown')
+          .expect(404)
+          .expect('Not Found via selector');
+      });
     });
   });
 });

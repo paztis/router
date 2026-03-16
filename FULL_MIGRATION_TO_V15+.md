@@ -26,6 +26,7 @@ The guide is written so you can either:
 - [6. Behavioral Changes and Best Practices](#6-behavioral-changes-and-best-practices)
   - [6.1. Parameter validation (replacement for `:param(regex)`)](#61-parameter-validation-replacement-for-paramregex)
   - [6.2. Nested routers and prefixes](#62-nested-routers-and-prefixes)
+  - [6.3. New features in v15 (non-breaking additions)](#63-new-features-in-v15-non-breaking-additions)
 - [7. Migration Recipes](#7-migration-recipes)
   - [7.1. Minimal "just works" upgrade](#71-minimal-just-works-upgrade)
   - [7.2. Strictly typed TypeScript upgrade](#72-strictly-typed-typescript-upgrade)
@@ -350,6 +351,7 @@ Key types live in `src/types.ts` and are exported from the main entry:
     routerPath?: string;
     routerName?: string;
     matched?: Layer[];
+    routeMatched?: boolean; // NEW: true if any route (with HTTP methods) matched
     captures?: string[];
     newRouterPath?: string;
     router: Router<StateT, ContextT>;
@@ -357,6 +359,10 @@ Key types live in `src/types.ts` and are exported from the main entry:
   ```
 
 - **RouterMiddleware**, **RouterParameterMiddleware**, **HttpMethod** etc. are also exported.
+
+- **RouterEvent**, **RouterEventSelector** (new) — types for the experimental event system.
+
+- **RouterEvents** (new) — named constants for router lifecycle events (e.g. `RouterEvents.NotFound`).
 
 **Migration tips:**
 
@@ -475,6 +481,87 @@ router.purge('/cache/:key', (ctx) => {
 
 - If you used nested routers heavily in v10, compare against the **`recipes/nested-routes`** implementation and tests.
 - It’s a good template for **production-grade nested routing** with the new behavior.
+
+---
+
+## 6.3. New features in v15 (non-breaking additions)
+
+These features are purely additive — they don't break any existing behavior.
+
+### `ctx.routeMatched`
+
+A new `boolean` property on `RouterContext` (and the Koa context while the router is active). It is set by the router **before any route handlers run** and indicates whether a route with HTTP methods matched the current request.
+
+- `true` — at least one route matched path + method.
+- `false` — no route matched (the request fell through).
+- `undefined` — the request never entered the router (host mismatch, etc.).
+
+Use it in **app-level middleware after `router.routes()`** to detect unmatched requests:
+
+```ts
+app.use(router.routes());
+app.use(router.allowedMethods());
+
+app.use((ctx) => {
+  if (!ctx.routeMatched) {
+    ctx.status = 404;
+    ctx.body = { error: 'Not Found', path: ctx.path };
+  }
+});
+```
+
+> **Note:** Do not check `ctx.routeMatched` inside a catch-all route handler
+> (`router.all('{/*rest}', handler)`). Since the catch-all is itself a route, it always
+> sets `ctx.routeMatched = true`. Use app-level middleware or `router.on()` instead.
+
+### `router.on()` — experimental event system
+
+Register handlers that run when specific router lifecycle events occur.
+Currently the only active event is `not-found`, which fires when no route matched.
+
+```ts
+import Router, { RouterEvents } from '@koa/router';
+
+const router = new Router();
+
+router.get('/users', handler);
+
+// Runs only when no route matched (instead of falling through to next())
+router.on(RouterEvents.NotFound, (ctx) => {
+  ctx.status = 404;
+  ctx.body = { error: 'Not Found', path: ctx.path };
+});
+
+app.use(router.routes());
+```
+
+All three call forms are equivalent:
+
+```ts
+router.on(RouterEvents.NotFound, handler); // named constant (recommended)
+router.on((events) => events.NotFound, handler); // selector function
+router.on('not-found', handler); // raw string
+```
+
+Multiple handlers for the same event are composed in registration order (koa-compose
+onion model) — the same way route middleware stacks work.
+
+> **Experimental:** This API may change in future minor versions.
+
+### New exports
+
+| Export                | Kind    | Description                                                             |
+| --------------------- | ------- | ----------------------------------------------------------------------- |
+| `RouterEvents`        | `const` | Named constants for active lifecycle events (`NotFound: 'not-found'`)   |
+| `RouterEvent`         | `type`  | Union of valid event name strings (derived from `RouterEvents`)         |
+| `RouterEventSelector` | `type`  | `RouterEvent` string or selector function `(events) => events.NotFound` |
+
+Import them from `@koa/router`:
+
+```ts
+import { RouterEvents } from '@koa/router';
+import type { RouterEvent, RouterEventSelector } from '@koa/router';
+```
 
 ---
 
