@@ -275,17 +275,21 @@ describe('Router', () => {
     assert.strictEqual('all' in res.body, true);
   });
 
-  it("runs only the last match when the 'exclusive' option is enabled", async () => {
+  it("runs only the less param match when the 'exclusive' option is enabled", async () => {
     const app = new Koa();
     const router = new Router({ exclusive: true });
 
     router
-      .get('users_single', new RegExp('/users/:id(.*)'), (ctx, next) => {
-        ctx.body = { single: true };
+      .get('users_single', '/users/:id{/*path}', (ctx, next) => {
+        ctx.body = { ...(ctx.body as object), single: true };
         next();
       })
       .get('users_all', '/users/all', (ctx, next) => {
         ctx.body = { ...(ctx.body as object), all: true };
+        next();
+      })
+      .get('any_all', '/:any/all', (ctx, next) => {
+        ctx.body = { ...(ctx.body as object), any: true };
         next();
       });
 
@@ -296,7 +300,32 @@ describe('Router', () => {
       .expect(200);
 
     assert.strictEqual('single' in res.body, false);
+    assert.strictEqual('any' in res.body, false);
     assert.strictEqual('all' in res.body, true);
+  });
+
+  it("runs only the less param match when the 'exclusive' option is enabled - last in case of equality", async () => {
+    const app = new Koa();
+    const router = new Router({ exclusive: true });
+
+    router
+        .get('users_single', '/users/:id', (ctx, next) => {
+          ctx.body = { ...(ctx.body as object), single: true };
+          next();
+        })
+        .get('any_all', '/:any/all', (ctx, next) => {
+          ctx.body = { ...(ctx.body as object), any: true };
+          next();
+        });
+
+    const res = await request(
+        http.createServer(app.use(router.routes()).callback())
+    )
+        .get('/users/all')
+        .expect(200);
+
+    assert.strictEqual('single' in res.body, false);
+    assert.strictEqual('any' in res.body, true);
   });
 
   it('does not run subsequent middleware without calling next', async () => {

@@ -641,11 +641,14 @@ class RouterImplementation<
     matchedLayers: Layer<StateT, ContextT>[],
     requestPath: string
   ): RouterMiddleware<StateT, ContextT>[] {
-    const layersToExecute = this.opts.exclusive
-      ? [matchedLayers.at(-1)].filter(
-          (layer): layer is Layer<StateT, ContextT> => layer !== undefined
-        )
-      : matchedLayers;
+    let layersToExecute = matchedLayers;
+    if (this.exclusive) {
+      const matchedLayer = matchedLayers
+          // sort items by number of parameters in descending order
+          .toSorted((a, b) => b.paramNames.length - a.paramNames.length)
+          .at(-1);
+      layersToExecute = matchedLayer ? [matchedLayer] : [];
+    }
 
     const middlewareChain: RouterMiddleware<StateT, ContextT>[] = [];
 
